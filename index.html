@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>Leg Day v1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-exercise-at-a-time logbook. Plate strip on top, motion + cues side by side, set table, rest bar pinned to the bottom. */
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --sunk:#e3e6eb; --ink:#161a22; --muted:#5d6574; --line:#cfd4dc;
+  --accent:#2a55d9; --accent-ink:#ffffff; --done:#1f8a52; --done-soft:#dcf0e4; --rest:#f2b705; --rest-ink:#1b1600;
+  --fig-near:#161a22; --fig-far:#9aa3b2; --prop:#2a55d9;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12151b; --surface:#1b2029; --sunk:#232935; --ink:#e9ecf2; --muted:#9aa3b3; --line:#323a48;
+  --accent:#6e92ff; --accent-ink:#0b1430; --done:#4cc985; --done-soft:#17352a; --rest:#f5c534; --rest-ink:#1b1600;
+  --fig-near:#e9ecf2; --fig-far:#5b6577; --prop:#6e92ff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151b; --surface:#1b2029; --sunk:#232935; --ink:#e9ecf2; --muted:#9aa3b3; --line:#323a48;
+  --accent:#6e92ff; --accent-ink:#0b1430; --done:#4cc985; --done-soft:#17352a; --rest:#f5c534; --rest-ink:#1b1600;
+  --fig-near:#e9ecf2; --fig-far:#5b6577; --prop:#6e92ff; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 120px}
+.wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:2.3rem;line-height:1;margin:0;letter-spacing:.01em;text-transform:uppercase}
+.sub{color:var(--muted);font-size:.9rem;margin-top:4px}
+.sub a{color:var(--accent)}
+.restpick,.daypick{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
+.restpick button,.daypick button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-weight:600;font-variant-numeric:tabular-nums}
+.restpick button[aria-pressed="true"],.daypick button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.hdr-r{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.daypick button{font-family:var(--display);font-size:1rem;letter-spacing:.04em;text-transform:uppercase;padding:4px 14px}
+.strip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.chip{border:0;background:var(--surface);border-radius:10px;padding:8px 4px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  box-shadow:inset 0 0 0 1px var(--line);min-width:0}
+.chip b{font-family:var(--display);font-size:1.25rem;line-height:1}
+.chip small{font-size:.66rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-transform:uppercase;letter-spacing:.04em}
+.chip[aria-current="true"]{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.chip[aria-current="true"] small{color:var(--accent-ink);opacity:.85}
+.chip.done{box-shadow:inset 0 0 0 2px var(--done)}
+.chip.done b::after{content:" ✓";color:var(--done);font-size:.9rem}
+.chip[aria-current="true"].done b::after{color:var(--accent-ink)}
+
+.extitle{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+h2{font-family:var(--display);font-weight:700;font-size:1.9rem;line-height:1.05;margin:0;text-wrap:balance}
+.rx{font-family:var(--display);font-weight:600;font-size:1.15rem;color:var(--muted);letter-spacing:.02em}
+.rx b{color:var(--ink)}
+
+.demo{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px}
+@media (max-width:600px){.demo{grid-template-columns:1fr}}
+.stage{background:var(--surface);border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);position:relative;overflow:hidden;min-width:0}
+canvas{display:block;width:100%;aspect-ratio:4/3;max-width:100%}
+.vid{display:none;position:relative;width:100%;aspect-ratio:16/9;background:#000}
+.vid iframe,.vid>div{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
+.stage.has-vid .vid{display:block}
+.stage.has-vid canvas{display:none}
+.stagebar{position:absolute;left:10px;right:10px;bottom:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.stagebar>*{pointer-events:auto}
+.pill{border:0;border-radius:999px;padding:6px 12px;font-size:.85rem;font-weight:600;background:var(--sunk);color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.pill.primary{background:var(--accent);color:var(--accent-ink)}
+.tips{background:var(--sunk);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.tips h3{font-family:var(--display);font-size:.95rem;letter-spacing:.08em;text-transform:uppercase;margin:0;color:var(--muted);font-weight:700}
+.tips ol{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px}
+.tips li::marker{font-family:var(--display);font-weight:700;color:var(--accent)}
+.feel,.avoid{font-size:.92rem;margin:0}
+.feel b,.avoid b{font-family:var(--display);letter-spacing:.06em;text-transform:uppercase;font-size:.85rem;margin-right:4px}
+.avoid b{color:#c2410c}
+.tempo{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.log{background:var(--surface);border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);padding:6px 0 10px}
+.row{display:grid;grid-template-columns:40px minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 52px;gap:8px;align-items:center;padding:6px 12px}
+.row.head{font-family:var(--display);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-block:8px 4px}
+.row .n{font-family:var(--display);font-weight:700;font-size:1.25rem;text-align:center}
+.row .prev{color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row input{width:100%;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 8px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums;font-size:1.05rem}
+.row input::placeholder{color:var(--muted);font-weight:500;opacity:.8}
+.tick{width:44px;height:40px;border-radius:10px;border:2px solid var(--line);background:transparent;font-size:1.1rem;font-weight:800;color:var(--muted)}
+.row.isdone{background:var(--done-soft)}
+.row.isdone .tick{background:var(--done);border-color:var(--done);color:#fff}
+.row.isdone input{border-color:transparent;background:transparent}
+.logfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px 0;flex-wrap:wrap}
+.ghost{border:1px dashed var(--line);background:transparent;border-radius:10px;padding:8px 14px;font-weight:600}
+.saved{font-size:.8rem;color:var(--muted)}
+
+.nav{display:flex;justify-content:space-between;gap:10px}
+.nav button{flex:1;border:0;border-radius:12px;padding:14px;font-family:var(--display);font-weight:700;font-size:1.15rem;letter-spacing:.04em;text-transform:uppercase;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.nav button.next{background:var(--ink);color:var(--bg);box-shadow:none}
+.nav button:disabled{opacity:.35;cursor:default}
+
+.restbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--rest);color:var(--rest-ink);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:12px;box-shadow:0 -6px 24px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .25s ease}
+.restbar.on{transform:none}
+.restbar .lbl{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:.85rem;line-height:1.1}
+.restbar .t{font-family:var(--display);font-weight:800;font-size:2.4rem;line-height:1;font-variant-numeric:tabular-nums;min-width:3.2ch}
+.restbar .prog{flex:1;height:8px;border-radius:99px;background:rgba(0,0,0,.15);overflow:hidden;min-width:40px}
+.restbar .prog i{display:block;height:100%;background:var(--rest-ink);width:100%;transform-origin:left}
+.restbar button{border:0;border-radius:10px;padding:9px 11px;font-weight:700;background:rgba(0,0,0,.12);color:var(--rest-ink);font-variant-numeric:tabular-nums}
+.restbar.over{background:var(--done);color:#fff}
+.restbar.over button{color:#fff;background:rgba(255,255,255,.2)}
+.restbar.over .prog i{background:#fff}
+@media (prefers-reduced-motion: reduce){.restbar{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title">Leg Day v1</h1>
+      <div class="sub"><span id="today"></span> · <span id="progress"></span> · <a id="plink" href="https://www.youtube.com/playlist?list=PLceyAUiKKclxn3VE34Rlkcc-xc7Wqinl4" target="_blank" rel="noopener">Playlist</a></div>
+    </div>
+    <div class="hdr-r">
+      <div class="daypick" role="group" aria-label="Workout day">
+        <button id="d-legs" data-d="legs">Legs</button><button id="d-upper" data-d="upper">Upper</button><button id="d-full" data-d="full">Full</button>
+      </div>
+      <div class="restpick" role="group" aria-label="Rest length">Rest
+        <button id="r45" data-s="45">45s</button><button id="r60" data-s="60">60s</button><button id="r90" data-s="90">90s</button><button id="r120" data-s="120">2m</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="strip" id="strip" aria-label="Exercises"></nav>
+
+  <section class="extitle">
+    <h2 id="exname"></h2>
+    <div class="rx" id="exrx"></div>
+  </section>
+
+  <section class="demo">
+    <div class="stage" id="stage">
+      <div class="vid"><div id="ytp"></div></div>
+      <canvas id="cv" width="640" height="480" aria-label="Looping motion demo"></canvas>
+      <div class="stagebar">
+        <button class="pill" id="pause" type="button">Pause</button>
+        <a class="pill primary" id="watch" target="_blank" rel="noopener">▶ Full video</a>
+      </div>
+    </div>
+    <aside class="tips">
+      <h3>Form cues</h3>
+      <ol id="cues"></ol>
+      <p class="feel" id="feel"></p>
+      <p class="avoid" id="avoid"></p>
+      <div class="tempo" id="tempo"></div>
+    </aside>
+  </section>
+
+  <section class="log" aria-label="Sets">
+    <div class="row head"><span style="text-align:center">Set</span><span>Last time</span><span style="text-align:center" id="wlabel">Lbs</span><span style="text-align:center">Reps</span><span></span></div>
+    <div id="rows"></div>
+    <div class="logfoot">
+      <div style="display:flex;gap:8px"><button class="ghost" id="addset" type="button">+ Add set</button><button class="ghost" id="rmset" type="button">− Remove</button></div>
+      <span class="saved" id="saved"></span>
+    </div>
+  </section>
+
+  <div class="nav"><button id="prev" type="button">← Prev</button><button id="next" class="next" type="button">Next →</button></div>
+</div>
+
+<div class="restbar" id="restbar" role="timer" aria-live="off">
+  <div><div class="lbl" id="restlbl">Rest</div><div class="t" id="restt">1:30</div></div>
+  <div class="prog"><i id="restprog"></i></div>
+  <button id="rminus" type="button">−15</button><button id="rplus" type="button">+15</button><button id="rskip" type="button">Done</button>
+</div>
+
+<script>
+(function(){
+"use strict";
+// ---------- Exercise library ----------
+// Poses: world units, y up, ground y=0, facing right. hip + torso angle (deg) gives the shoulder; feet/hands placed; knees/elbows solved by IK.
+const LEGS=[
+ {id:"bridge",yt:"AL7VE_qo1K0",s:16,e:24,name:"Glute Bridge",video:"Glute bridge 2",sets:3,reps:"12",bw:true,
+  cues:["Feet flat, about a hand-length from your glutes, hip-width apart.","Brace your abs and tuck your ribs down before you lift.","Drive through your heels and squeeze your glutes to raise your hips.","Pause 2 seconds at the top, then lower with control."],
+  feel:"Glutes, with some hamstrings.",avoid:"Arching your lower back to get higher. Stop where your glutes finish the job.",tempo:"Tempo 1 up · 2 hold · 2 down",
+  vb:[20,195,-12,100],kp:{L:[0,1],R:[0,1]},ep:{L:[0,-1],R:[0,-1]},props:["mat"],
+  keys:[{hip:[110,10],ta:180,fL:[158,1],fR:[163,1],hL:[82,3],hR:[86,3]},{hip:[102,50],ta:221,fL:[158,1],fR:[163,1],hL:[82,3],hR:[86,3]}],seq:[0,1]},
+ {id:"deadbug",yt:"RWp83SigTXg",s:85,e:91,name:"Dead Bug",video:"Dead bug tutorial",sets:3,reps:"8/side",bw:true,
+  cues:["Arms straight up over your shoulders, hips and knees at 90°.","Press your lower back into the floor and keep it there the whole set.","Reach the opposite arm and leg out slowly, exhale as you go.","Return to start, then switch sides."],
+  feel:"Deep abs. Your back should feel nothing.",avoid:"Letting your lower back peel off the floor. Shorten the reach instead.",tempo:"Slow: 3 seconds out, 2 back",
+  vb:[-30,200,-12,95],kp:{L:[0,1],R:[0,1]},ep:{L:[0,1],R:[0,1]},props:["mat"],
+  keys:[{hip:[100,10],ta:180,fL:[143,54],fR:[147,54],hL:[40,66],hR:[43,66]},
+        {hip:[100,10],ta:180,fL:[143,54],fR:[186,14],hL:[-14,15],hR:[43,66]},
+        {hip:[100,10],ta:180,fL:[186,14],fR:[147,54],hL:[40,66],hR:[-14,15]}],seq:[0,1,0,2]},
+ {id:"goblet",yt:"lXy8MfZNNyU",s:116.5,e:131,name:"Goblet Squat",video:"Goblet Squat Exercise Tutorial",sets:3,reps:"10",bw:false,
+  cues:["Hold the dumbbell vertically against your chest, elbows tucked.","Feet shoulder-width, toes slightly out.","Sit down between your heels, knees tracking over your toes.","Keep your chest tall and drive the floor away to stand."],
+  feel:"Quads and glutes; upper back works to stay tall.",avoid:"Heels lifting or knees caving in. Go only as deep as you can keep both.",tempo:"Tempo 3 down · 1 pause · 1 up",
+  vb:[30,175,-12,175],kp:{L:[1,0],R:[1,0]},ep:{L:[0,-1],R:[0,-1]},props:["db-goblet"],
+  keys:[{hip:[100,87],ta:90,fL:[98,0],fR:[104,0],hLr:[12,-22],hRr:[15,-22]},{hip:[70,42],ta:68,fL:[98,0],fR:[104,0],hLr:[12,-22],hRr:[15,-22]}],seq:[0,1]},
+ {id:"slrdl",yt:"14uIyy6htzU",s:0,e:25.5,name:"Supported Single-Leg RDL",video:"Supported Single leg RDL",sets:3,reps:"8/leg",bw:false,
+  cues:["Light hand on the rack for balance only, weight in the other hand.","Soft bend in the standing knee and keep it there.","Push your hips back and let the free leg travel straight back.","Keep hips square to the floor; stand up by squeezing the glute."],
+  feel:"Hamstring stretch and glute of the standing leg.",avoid:"Rounding your back or opening your hip toward the ceiling.",tempo:"Tempo 3 down · 1 up",
+  vb:[0,190,-12,175],kp:{L:[1,0],R:[0,-1]},ep:{L:[0,-1],R:[0,-1]},props:["pole-back","db-hang-L"],
+  keys:[{hip:[100,87],ta:92,fL:[100,0],fR:[96,4],hL:[100,92],hR:[135,128]},{hip:[95,84],ta:14,fL:[100,0],fR:[11,61],hL:[150,44],hR:[137,72]}],seq:[0,1]},
+ {id:"revcrunch",yt:"XVOIElqv5CQ",s:0,e:11.5,name:"Reverse Crunch",video:"Reverse crunches",sets:3,reps:"12",bw:true,
+  cues:["Lie flat and hold something solid overhead.","Start with knees bent and thighs about vertical.","Curl your hips off the floor, bringing knees toward your chest.","Lower your hips one vertebra at a time."],
+  feel:"Lower abs.",avoid:"Swinging the legs for momentum. The hips curl; the legs just ride along.",tempo:"Tempo 1 up · 1 hold · 3 down",
+  vb:[-35,175,-12,115],kp:{L:[0,1],R:[0,1]},ep:{L:[0,1],R:[0,1]},props:["mat","pole-front"],
+  keys:[{hip:[100,10],ta:180,fL:[138,40],fR:[142,40],hL:[-8,14],hR:[-6,14]},{hip:[92,26],ta:196,fL:[80,92],fR:[84,92],hL:[-8,14],hR:[-6,14],kpo:{L:[-1,.4],R:[-1,.4]}}],seq:[0,1]},
+ {id:"hipthrust",yt:"wpVUT3iCyXk",s:119,e:129,name:"Bodyweight Hip Thrust",video:"Bodyweight hip thrust",sets:3,reps:"15",bw:true,
+  cues:["Bench just under your shoulder blades, feet flat and hip-width.","Tuck your chin and keep your eyes forward as you rise.","Drive through your heels until your hips are level with your knees.","Squeeze hard for 2 seconds, lower under control."],
+  feel:"Glutes, hard at the top.",avoid:"Overextending your lower back at the top. Ribs stay down.",tempo:"Tempo 1 up · 2 hold · 2 down",
+  vb:[-15,195,-12,105],kp:{L:[0,1],R:[0,1]},ep:{L:[0,1],R:[0,1]},props:["bench"],
+  keys:[{hip:[96,20],ta:158,fL:[150,0],fR:[155,0],hL:[10,42],hR:[13,42]},{hip:[98,50],ta:188,fL:[150,0],fR:[155,0],hL:[10,42],hR:[13,42]}],seq:[0,1]},
+ {id:"splitsquat",yt:"_dCpU-6yQF8",s:35,e:41.5,name:"DB Split Squat",video:"DB Split Squat 2",sets:3,reps:"8/leg",bw:false,
+  cues:["Long stance: front foot flat, back foot up on the toes.","Dumbbells hang at your sides, torso tall.","Drop straight down until the back knee almost touches.","Push through the front heel to stand. Finish all reps, then switch legs."],
+  feel:"Front-leg quad and glute.",avoid:"Lunging forward. The movement is down and up, like an elevator.",tempo:"Tempo 2 down · 1 up",
+  vb:[15,170,-12,175],kp:{L:[.3,-1],R:[1,.2]},ep:{L:[0,-1],R:[0,-1]},props:["db-hang-L","db-hang-R"],
+  keys:[{hip:[88,80],ta:90,fL:[48,4],fR:[122,0],hLr:[-3,-54],hRr:[0,-54]},{hip:[86,48],ta:90,fL:[48,4],fR:[122,0],hLr:[-3,-54],hRr:[0,-54]}],seq:[0,1]}
+];
+// Upper and Full days: no stick-figure poses (no `keys`), so the canvas fallback shows a "video unavailable" note.
+const UPPER=[
+ {id:"latstretch",yt:"KA0Cz2Jx96Q",s:21,e:35,name:"Lat Stretch",video:"Lat Stretch",sets:2,reps:"30s",bw:true,
+  cues:["Kneel facing a bench with your elbows on the edge, holding a stick or dowel.","Sit your hips back toward your heels.","Let your chest sink below the bench and bring your hands behind your head.","Breathe slowly and sink a little deeper on each exhale."],
+  feel:"A long stretch down the sides of your back (lats) and into the triceps.",avoid:"Arching your lower back to fake depth. Keep your ribs down.",tempo:"Hold 30 s · slow breaths"},
+ {id:"pullapart",yt:"rqrC3CGPLYU",s:0,e:23.5,name:"Band Pull-Apart",video:"Band Pull aparts",sets:3,reps:"15",bw:true,
+  cues:["Arms straight out in front at shoulder height, hands shoulder-width on the band.","Keep your shoulders down, away from your ears.","Pull the band apart by squeezing your shoulder blades together until it reaches your chest.","Return slowly; don't let the band snap you back."],
+  feel:"Upper back and the backs of your shoulders.",avoid:"Shrugging or arching your back to finish the rep.",tempo:"Tempo 1 out · 1 hold · 2 back"},
+ {id:"elevpush",yt:"05b8XPyLjK0",s:8.5,e:23.5,name:"Elevated Push-Up",video:"Elevated hands Push Up",sets:3,reps:"10",bw:true,
+  cues:["Hands on a bench or bar, just outside shoulder width.","Body in one straight line from head to heels; glutes and abs tight.","Lower your chest to the edge with elbows about 45° from your sides.","Press the bench away until your arms are straight. Higher hands make it easier."],
+  feel:"Chest, front of the shoulders and triceps.",avoid:"Hips sagging or piking up. Move as one plank.",tempo:"Tempo 2 down · 1 up"},
+ {id:"dbrow",yt:"-iO2ZBSD1xw",s:0,e:22.5,name:"Bent-Over DB Row",video:"Bent Over DB Row",sets:3,reps:"10",bw:false,
+  cues:["Hinge at the hips with soft knees and a flat back.","Let the dumbbells hang under your shoulders.","Pull your elbows back toward your hips, squeezing your shoulder blades.","Lower all the way with control."],
+  feel:"Lats and mid-back.",avoid:"Rounding your back or heaving the weight with your hips.",tempo:"Tempo 1 up · 1 hold · 2 down"},
+ {id:"kneelpress",yt:"2uQuLzrk_Eo",s:146.8,e:152.6,name:"Half-Kneeling DB Press",video:"Half Kneeling Single Arm DB Press Tutorial",sets:3,reps:"8/arm",bw:false,
+  cues:["One knee down, front foot flat, torso tall. Squeeze the glute of the down leg.","Dumbbell at your shoulder, wrist stacked over your elbow.","Press straight up until your arm is locked out beside your ear.","Lower to the shoulder with control. Finish all reps, then switch sides."],
+  feel:"Shoulder of the pressing arm, plus your core working to stay upright.",avoid:"Leaning away or arching your back to get the weight up.",tempo:"Tempo 1 up · 2 down"},
+ {id:"helmsrow",yt:"s8XfN4biers",s:93.5,e:102.5,name:"Helms Underhand Row",video:"Helms Underhand Row",sets:3,reps:"10",bw:false,
+  cues:["Rest your forehead on the top of an incline bench and hinge until your back is flat.","Dumbbells hang straight down, palms facing forward (underhand).","Row your elbows back close to your sides.","Lower all the way to a full stretch. Keep your head on the pad."],
+  feel:"Lats and biceps.",avoid:"Lifting your head or using your hips to swing the weight.",tempo:"Tempo 1 up · 1 hold · 2 down"},
+ {id:"lateral",yt:"FDreHfmyq5c",s:0,e:22.2,name:"DB Lateral Raise",video:"Standing DB Side Lateral Raise",sets:3,reps:"12",bw:false,
+  cues:["Stand tall with a slight forward lean and soft elbows.","Raise the dumbbells out to your sides, leading with your elbows.","Stop at shoulder height.","Lower slowly. Light weight, strict form."],
+  feel:"Sides of your shoulders.",avoid:"Shrugging or swinging your body to lift the weight.",tempo:"Tempo 1 up · 3 down"},
+ {id:"skull",yt:"iFrvIcOxdnk",s:25,e:37,name:"DB Skullcrusher",video:"DB Skullcrusher Tutorial",sets:3,reps:"10",bw:false,
+  cues:["Lie on your back, knees bent, dumbbells straight up over your shoulders, palms facing in.","Keep your upper arms still and bend only at the elbows.","Lower the dumbbells beside your head.","Straighten your arms back up and squeeze your triceps."],
+  feel:"Triceps.",avoid:"Elbows flaring out or upper arms drifting back and forth.",tempo:"Tempo 3 down · 1 up"}
+];
+const FULL=[
+ {id:"hip9090",yt:"HTmGVp_sxKs",s:0,e:34,name:"Hip 90/90",video:"Hip 90 90",sets:2,reps:"6/side",bw:true,
+  cues:["Sit with both knees bent to 90°: one leg in front of you, the other out to the side.","Use your hands behind you for support if you need it.","Keep your feet planted and rotate both knees over to the other side.","Sit tall at each side, then switch smoothly."],
+  feel:"Hips opening and rotating, front and back.",avoid:"Forcing through knee pain. The turn comes from the hips.",tempo:"Slow and controlled"},
+ {id:"hollowpull",yt:"iQxYUPymBYo",s:43.5,e:54.5,name:"Hollow Hold Pullover",video:"Hollow Hold Pullover",sets:3,reps:"8",bw:false,
+  cues:["Lie on your back, legs up, and hold one dumbbell over your chest with both hands.","Press your lower back into the floor and keep your ribs down.","Lower the dumbbell overhead as far as your back stays flat.","Pull it back over your chest without letting your legs drop."],
+  feel:"Abs working hard to stay flat, plus a stretch through the lats.",avoid:"Your lower back lifting off the floor. Shorten the reach instead.",tempo:"Tempo 3 back · 2 over"},
+ {id:"gbrdl",yt:"dFb-cNLRtJ0",s:0,e:33.5,name:"Glute-Bias DB RDL",video:"Glute Bias DB RDL 2",sets:3,reps:"10",bw:false,
+  cues:["Dumbbells in front of your thighs, soft knees, back flat.","Push your hips back and let the dumbbells slide down your legs.","Stop when your hips can't travel back any further.","Drive your hips forward to stand and squeeze your glutes at the top."],
+  feel:"Glutes and hamstrings.",avoid:"Rounding your back or turning it into a squat.",tempo:"Tempo 3 down · 1 up"},
+ {id:"standpress",yt:"HAcqhLcY1yg",s:0,e:16.5,name:"Standing DB Shoulder Press",video:"Standing DB Shoulder Press",sets:3,reps:"10",bw:false,
+  cues:["Feet hip-width; squeeze your glutes and keep your ribs down.","Dumbbells at your shoulders, palms forward.","Press straight up until your arms lock out overhead.","Lower back to your shoulders with control."],
+  feel:"Shoulders and triceps.",avoid:"Leaning back or arching your lower back to finish the press.",tempo:"Tempo 1 up · 2 down"},
+ {id:"revlunge",yt:"Rv4P4cetZjQ",s:10.5,e:16,name:"Supported Reverse Lunge",video:"Supported Reverse Lunge",sets:3,reps:"8/leg",bw:false,
+  cues:["One hand on a rack or bench for balance, dumbbell in the other.","Step one foot back and drop the back knee toward the floor.","Keep most of your weight on the front foot.","Drive through the front heel to step back up. Finish all reps, then switch legs."],
+  feel:"Front-leg glute and quad.",avoid:"Pushing off the back foot to stand up.",tempo:"Tempo 2 down · 1 up"},
+ {id:"widerow",yt:"yIZYTVUBH0M",s:63,e:73,name:"1-Arm Elbow-Wide Row",video:"1 arm elbow wide row",sets:3,reps:"10/arm",bw:false,
+  cues:["Hinge with a flat back, free hand on a bench or rack.","Let the dumbbell hang under your shoulder.","Row with your elbow flaring out wide, away from your side.","Squeeze your upper back at the top, lower slowly."],
+  feel:"Upper back and the back of the shoulder.",avoid:"Twisting your torso open to lift the weight.",tempo:"Tempo 1 up · 1 hold · 2 down"},
+ {id:"heelgoblet",yt:"hVQ1glE0yLQ",s:117.5,e:130.3,name:"Heel-Elevated Goblet Squat",video:"Heel Elevated Goblet Squat Tutorial",sets:3,reps:"10",bw:false,
+  cues:["Heels up on a plate or wedge, feet about hip-width.","Hold the weight at your chest, elbows pointing down.","Sit straight down and let your knees travel forward over your toes.","Keep your chest tall and push the floor away to stand."],
+  feel:"Quads, a lot.",avoid:"Your chest folding forward at the bottom.",tempo:"Tempo 3 down · 1 up"},
+ {id:"reardelt",yt:"wbxcToQE168",s:0,e:14.8,name:"Bent-Over Rear Delt Extension",video:"Bent over rear delt ext",sets:3,reps:"12",bw:false,
+  cues:["Hinge forward with a flat back, dumbbells hanging under your shoulders.","Keep your arms straight.","Sweep the dumbbells back past your hips.","Pause, then let them swing back under you with control."],
+  feel:"Back of the shoulders and upper back.",avoid:"Bending your elbows or standing up to swing the weight.",tempo:"Tempo 1 back · 1 hold · 2 down"}
+];
+const DAYS={legs:{title:"Leg Day v1",list:"PLceyAUiKKclxn3VE34Rlkcc-xc7Wqinl4",ex:LEGS},
+            upper:{title:"Upper Day v1",list:"PLceyAUiKKclzSP0-VMYWsRDRwrxQlFt-H",ex:UPPER},
+            full:{title:"Full Day v1",list:"PLceyAUiKKclyHJcwvIiEJ41wtSt-rYKYQ",ex:FULL}};
+const ALL=[...LEGS,...UPPER,...FULL];
+let day="legs", EX=LEGS;
+const YT="https://www.youtube.com/results?search_query=";
+
+// ---------- Helpers ----------
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const dkey=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const TODAY=dkey(new Date());
+const fmtDate=k=>{const [y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})};
+const lsGet=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+
+// ---------- State ----------
+let cur=0, history=[], rest=90;
+let session=null;
+function blankSession(){
+  const s={date:TODAY,ex:{}};
+  return fillSession(s);
+}
+// Sessions hold every day's exercises (ids are unique across days); older sessions only have leg ids.
+function fillSession(s){
+  ALL.forEach(e=>{ if(!s.ex[e.id]) s.ex[e.id]={sets:Array.from({length:e.sets},()=>({w:"",r:"",done:false}))}; });
+  return s;
+}
+session=blankSession();
+const st0=lsGet("legday.ui"); if(st0){ if(DAYS[st0.day]){ day=st0.day; EX=DAYS[day].ex; } if(typeof st0.cur==="number"&&st0.cur>=0&&st0.cur<EX.length) cur=st0.cur; if(st0.rest) rest=st0.rest; }
+
+// ---------- Storage: private per-viewer db, local fallback ----------
+const store={db:null,col:null,mode:"local",
+  async init(){
+    try{
+      if(!window.claude||!window.claude.use) return;
+      const [db,user]=await Promise.all([window.claude.use("db"),window.claude.use("user")]);
+      if(!db||!user) return;
+      const uid=await user.id(); if(!uid) return;
+      this.db=db; this.col=db.collection("data/users/"+uid); this.mode="db";
+    }catch(e){}
+  },
+  async loadAll(){
+    if(this.mode==="db"){
+      try{const q=await this.col.get(); const out=[]; let settings=null;
+        q.docs.forEach(d=>{ if(d.id.startsWith("s-")) out.push(d.data()); else if(d.id==="settings") settings=d.data(); });
+        return {sessions:out,settings};
+      }catch(e){}
+    }
+    return {sessions:lsGet("legday.sessions")||[],settings:null};
+  },
+  async save(s){
+    const all=(lsGet("legday.sessions")||[]).filter(x=>x.date!==s.date); all.push(s); lsSet("legday.sessions",all);
+    if(this.mode==="db"){ await this.col.doc("s-"+s.date).set(JSON.parse(JSON.stringify(s))); }
+  },
+  async saveSettings(o){ if(this.mode==="db"){ try{await this.col.doc("settings").set(o)}catch(e){} } }
+};
+
+let saveTimer=null, saving=Promise.resolve();
+function queueSave(){
+  $("saved").textContent="Saving…";
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    saving=saving.then(()=>store.save(session)).then(()=>{$("saved").textContent=store.mode==="db"?"Saved to your log":"Saved on this device"})
+      .catch(()=>{$("saved").textContent="Couldn't save. Check your connection; your entries are still here."});
+  },600);
+}
+
+function prevFor(exId){
+  const past=history.filter(s=>s.date<TODAY&&s.ex&&s.ex[exId]&&s.ex[exId].sets.some(x=>x.r!==""||x.w!=="")).sort((a,b)=>a.date<b.date?1:-1);
+  return past[0]||null;
+}
+
+// ---------- Render ----------
+function renderStrip(){
+  const strip=$("strip"); strip.innerHTML=""; strip.style.gridTemplateColumns="repeat("+EX.length+",1fr)";
+  EX.forEach((e,i)=>{
+    const b=document.createElement("button"); b.type="button"; b.className="chip"; b.id="chip-"+e.id;
+    const sets=session.ex[e.id].sets; if(sets.length&&sets.every(x=>x.done)) b.classList.add("done");
+    b.setAttribute("aria-current",i===cur?"true":"false");
+    const n=document.createElement("b"); n.textContent=i+1; const s=document.createElement("small"); s.textContent=e.name.replace("Bodyweight ","BW ").replace("Supported ","");
+    b.append(n,s); b.onclick=()=>go(i); strip.appendChild(b);
+  });
+  const doneCount=EX.filter(e=>{const s=session.ex[e.id].sets;return s.length&&s.every(x=>x.done)}).length;
+  $("progress").textContent=doneCount+" of "+EX.length+" done";
+}
+function renderExercise(){
+  const e=EX[cur];
+  $("exname").textContent=e.name;
+  $("exrx").innerHTML=""; const b=document.createElement("b"); b.textContent=e.sets+" × "+e.reps; $("exrx").append(b, document.createTextNode(e.bw?"  bodyweight":"  dumbbell"));
+  const ol=$("cues"); ol.innerHTML=""; e.cues.forEach(c=>{const li=document.createElement("li");li.textContent=c;ol.appendChild(li)});
+  $("feel").innerHTML="<b>Feel it</b>"; $("feel").append(document.createTextNode(e.feel));
+  $("avoid").innerHTML="<b>Avoid</b>"; $("avoid").append(document.createTextNode(e.avoid));
+  $("tempo").textContent=e.tempo;
+  $("watch").href=e.yt?"https://www.youtube.com/watch?v="+e.yt+"&t="+Math.floor(e.s)+"s":YT+encodeURIComponent("Eric Roberts "+e.video);
+  $("wlabel").textContent=e.bw?"+Lbs":"Lbs";
+  $("prev").disabled=cur===0; $("next").textContent=cur===EX.length-1?"Finish ✓":"Next →";
+  renderRows(); renderStrip();
+  if(yt.show(e)) $("pause").textContent="Pause"; else { anim.start(e); $("pause").textContent=anim.paused?"Play":"Pause"; }
+  lsSet("legday.ui",{cur,rest,day});
+}
+function renderRows(){
+  const e=EX[cur], data=session.ex[e.id], last=prevFor(e.id), rows=$("rows"); rows.innerHTML="";
+  data.sets.forEach((s,i)=>{
+    const r=document.createElement("div"); r.className="row"+(s.done?" isdone":"");
+    const n=document.createElement("span"); n.className="n"; n.textContent=i+1;
+    const p=document.createElement("span"); p.className="prev";
+    const ls=last&&last.ex[e.id].sets[i];
+    p.textContent=ls&&(ls.r!==""||ls.w!=="")?((ls.w!==""?ls.w:(e.bw?"BW":"–"))+" × "+(ls.r||"–")):"—";
+    if(ls) p.title=fmtDate(last.date);
+    const w=document.createElement("input"); w.id="w-"+e.id+"-"+i; w.inputMode="decimal"; w.placeholder=ls&&ls.w!==""?ls.w:(e.bw?"BW":"lbs"); w.value=s.w; w.setAttribute("aria-label","Set "+(i+1)+" weight");
+    const rp=document.createElement("input"); rp.id="r-"+e.id+"-"+i; rp.inputMode="numeric"; rp.placeholder=String(parseInt(e.reps)); rp.value=s.r; rp.setAttribute("aria-label","Set "+(i+1)+" reps");
+    w.oninput=()=>{s.w=w.value.trim();queueSave()}; rp.oninput=()=>{s.r=rp.value.trim();queueSave()};
+    const t=document.createElement("button"); t.type="button"; t.className="tick"; t.textContent="✓"; t.setAttribute("aria-label","Mark set "+(i+1)+" done"); t.setAttribute("aria-pressed",s.done?"true":"false");
+    t.onclick=()=>{
+      unlockAudio();
+      s.done=!s.done;
+      if(s.done){ if(s.r==="") s.r=rp.placeholder; if(s.w===""&&w.placeholder&&w.placeholder!=="lbs"&&w.placeholder!=="BW") s.w=w.placeholder; }
+      queueSave(); renderRows(); renderStrip();
+      if(s.done){ const allDone=data.sets.every(x=>x.done); timer.start(rest, allDone&&cur<EX.length-1?"Next: "+EX[cur+1].name:"Rest"); }
+    };
+    r.append(n,p,w,rp,t); rows.appendChild(r);
+  });
+}
+function go(i){ if(i<0||i>=EX.length) return; cur=i; renderExercise(); window.scrollTo({top:0,behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"}); }
+$("prev").onclick=()=>go(cur-1);
+$("next").onclick=()=>{ if(cur<EX.length-1) go(cur+1); else { $("saved").textContent="Workout logged for "+fmtDate(TODAY)+"."; } };
+$("addset").onclick=()=>{ session.ex[EX[cur].id].sets.push({w:"",r:"",done:false}); queueSave(); renderRows(); renderStrip(); };
+$("rmset").onclick=()=>{ const s=session.ex[EX[cur].id].sets; if(s.length>1){ s.pop(); queueSave(); renderRows(); renderStrip(); } };
+
+function renderRestPick(){ document.querySelectorAll(".restpick button").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.s)===rest))); }
+function renderDay(){
+  const d=DAYS[day]; $("title").textContent=d.title; document.title=d.title;
+  $("plink").href="https://www.youtube.com/playlist?list="+d.list;
+  document.querySelectorAll(".daypick button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.d===day)));
+}
+document.querySelectorAll(".daypick button").forEach(b=>b.onclick=()=>{ if(b.dataset.d===day) return; day=b.dataset.d; EX=DAYS[day].ex; cur=0; renderDay(); go(0); });
+document.querySelectorAll(".restpick button").forEach(b=>b.onclick=()=>{ rest=Number(b.dataset.s); renderRestPick(); lsSet("legday.ui",{cur,rest,day}); store.saveSettings({rest}); });
+
+// ---------- Rest timer ----------
+let actx=null;
+function unlockAudio(){ try{ if(!actx){ const C=window.AudioContext||window.webkitAudioContext; if(C) actx=new C(); } if(actx&&actx.state==="suspended") actx.resume(); }catch(e){} wake(); }
+function beep(){ if(!actx) return; try{ [0,.22,.44].forEach((t,i)=>{ const o=actx.createOscillator(), g=actx.createGain(); o.frequency.value=i===2?1175:880; o.type="sine";
+  g.gain.setValueAtTime(.0001,actx.currentTime+t); g.gain.exponentialRampToValueAtTime(.35,actx.currentTime+t+.02); g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+t+.18);
+  o.connect(g).connect(actx.destination); o.start(actx.currentTime+t); o.stop(actx.currentTime+t+.2); }); }catch(e){} }
+const timer={end:0,total:0,iv:null,
+  start(sec,label){ this.total=sec; this.end=Date.now()+sec*1000; $("restlbl").textContent=label; $("restbar").classList.add("on"); $("restbar").classList.remove("over"); this.fired=false; clearInterval(this.iv); this.iv=setInterval(()=>this.tick(),200); this.tick(); },
+  add(s){ if(!this.iv) return; this.end+=s*1000; this.total=Math.max(this.total+s,1); if(this.end>Date.now()){ $("restbar").classList.remove("over"); this.fired=false; } this.tick(); },
+  stop(){ clearInterval(this.iv); this.iv=null; $("restbar").classList.remove("on","over"); },
+  tick(){ const left=Math.round((this.end-Date.now())/1000);
+    const a=Math.abs(left); $("restt").textContent=(left<0?"+":"")+Math.floor(a/60)+":"+pad(a%60);
+    $("restprog").style.transform="scaleX("+Math.max(0,Math.min(1,left/this.total))+")";
+    if(left<=0&&!this.fired){ this.fired=true; $("restbar").classList.add("over"); $("restlbl").textContent="Go: next set"; beep(); try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){} }
+    if(left<-90) this.stop(); }
+};
+$("rminus").onclick=()=>timer.add(-15); $("rplus").onclick=()=>timer.add(15); $("rskip").onclick=()=>timer.stop();
+
+let lock=null;
+async function wake(){ try{ if(!lock&&navigator.wakeLock&&document.visibilityState==="visible"){ lock=await navigator.wakeLock.request("screen"); lock.addEventListener("release",()=>{lock=null}); } }catch(e){} }
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){ wake(); if(timer.iv) timer.tick(); } });
+
+// ---------- Motion demo ----------
+const cv=$("cv"), ctx=cv.getContext("2d");
+const T=60, TH=45, SH=45, UA=30, FA=28, HEAD=11;
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function ik(a,c,l1,l2,pref){
+  let dx=c[0]-a[0], dy=c[1]-a[1], d=Math.hypot(dx,dy); const max=l1+l2-0.5; if(d>max){ d=max; } if(d<1) d=1;
+  const base=Math.atan2(dy,dx), ang=Math.acos(Math.max(-1,Math.min(1,(l1*l1+d*d-l2*l2)/(2*l1*d))));
+  const k1=[a[0]+l1*Math.cos(base+ang),a[1]+l1*Math.sin(base+ang)], k2=[a[0]+l1*Math.cos(base-ang),a[1]+l1*Math.sin(base-ang)];
+  const s1=(k1[0]-a[0])*pref[0]+(k1[1]-a[1])*pref[1], s2=(k2[0]-a[0])*pref[0]+(k2[1]-a[1])*pref[1];
+  return s1>=s2?k1:k2;
+}
+const lerp=(a,b,t)=>a+(b-a)*t, lp=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t)];
+function resolve(k){
+  const sh=[k.hip[0]+T*Math.cos(k.ta*Math.PI/180),k.hip[1]+T*Math.sin(k.ta*Math.PI/180)];
+  return {hip:k.hip,ta:k.ta,sh,fL:k.fL,fR:k.fR,hL:k.hLr?[sh[0]+k.hLr[0],sh[1]+k.hLr[1]]:k.hL,hR:k.hRr?[sh[0]+k.hRr[0],sh[1]+k.hRr[1]]:k.hR,kpo:k.kpo};
+}
+function blend(A,B,t){
+  const ta=lerp(A.ta,B.ta,t), hip=lp(A.hip,B.hip,t);
+  const sh=[hip[0]+T*Math.cos(ta*Math.PI/180),hip[1]+T*Math.sin(ta*Math.PI/180)];
+  return {hip,sh,fL:lp(A.fL,B.fL,t),fR:lp(A.fR,B.fR,t),hL:lp(A.hL,B.hL,t),hR:lp(A.hR,B.hR,t),kpo:t<.5?A.kpo:B.kpo};
+}
+const anim={ex:null,raf:0,t0:0,paused:false,pt:0,
+  start(e){ this.ex=e; this.keys=e.keys?e.keys.map(resolve):null; this.t0=performance.now(); this.pt=0; cancelAnimationFrame(this.raf); this.loop(); },
+  stop(){ cancelAnimationFrame(this.raf); },
+  loop(){ const now=performance.now(); const el=this.paused?this.pt:(now-this.t0); this.draw(el/1000); if(!this.paused) this.raf=requestAnimationFrame(()=>this.loop()); },
+  pose(sec){ const seq=this.ex.seq, seg=1.15, hold=0.35, per=seg+hold, n=seq.length, tt=sec%(per*n), i=Math.floor(tt/per), f=tt-i*per;
+    const A=this.keys[seq[i]], B=this.keys[seq[(i+1)%n]]; const u=f<hold?0:(f-hold)/seg; const e=0.5-0.5*Math.cos(Math.PI*u); return blend(A,B,e); },
+  draw(sec){
+    const e=this.ex, dpr=Math.min(window.devicePixelRatio||1,2), W=cv.clientWidth||640, H=W*0.75;
+    if(cv.width!==Math.round(W*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+    ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+    if(!this.keys){ // no figure for this exercise: point at the video instead
+      ctx.fillStyle=css("--muted"); ctx.textAlign="center"; ctx.font="600 "+Math.max(15,W/26)+"px "+css("--body");
+      ctx.fillText("Demo video unavailable",W/2,H/2-14); ctx.fillText("Tap ▶ Full video to watch",W/2,H/2+14); ctx.textAlign="start";
+      cancelAnimationFrame(this.raf); return;
+    }
+    const [x0,x1,y0,y1]=e.vb, padB=44, s=Math.min((W-24)/(x1-x0),(H-padB-16)/(y1-y0));
+    const ox=(W-(x1-x0)*s)/2-x0*s, oy=16+(y1-y0)*s+ (H-padB-16-(y1-y0)*s)/2 + y0*s;
+    const X=p=>ox+p[0]*s, Y=p=>oy-p[1]*s;
+    const near=css("--fig-near"), far=css("--fig-far"), prop=css("--prop"), line=css("--line"), sunk=css("--sunk");
+    // ground
+    ctx.strokeStyle=line; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(8,Y([0,0])); ctx.lineTo(W-8,Y([0,0])); ctx.stroke();
+    const P=this.pose(sec);
+    const kp=P.kpo||e.kp;
+    const kL=ik(P.hip,P.fL,TH,SH,kp.L), kR=ik(P.hip,P.fR,TH,SH,kp.R);
+    const eL=ik(P.sh,P.hL,UA,FA,e.ep.L), eR=ik(P.sh,P.hR,UA,FA,e.ep.R);
+    const lw=Math.max(5,s*7.5);
+    const seg=(pts,col,w)=>{ ctx.strokeStyle=col; ctx.lineWidth=w; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.beginPath(); ctx.moveTo(X(pts[0]),Y(pts[0])); for(let i=1;i<pts.length;i++) ctx.lineTo(X(pts[i]),Y(pts[i])); ctx.stroke(); };
+    const dbH=(p,col)=>{ ctx.fillStyle=col; const w=26*s, h=9*s; ctx.fillRect(X(p)-w/2,Y(p)-h/2+h*.2,w,h*.6); ctx.fillRect(X(p)-w/2-2,Y(p)-h,w*.28,h*2); ctx.fillRect(X(p)+w/2-w*.28+2,Y(p)-h,w*.28,h*2); };
+    // props behind
+    if(e.props.includes("mat")){ ctx.fillStyle=sunk; ctx.fillRect(X([x0+6,0]),Y([0,3]),(x1-x0-12)*s,3*s); }
+    if(e.props.includes("bench")){ ctx.fillStyle=sunk; ctx.fillRect(X([0,40]),Y([0,40]),58*s,7*s); ctx.fillRect(X([8,33]),Y([0,33]),6*s,33*s); ctx.fillRect(X([44,33]),Y([0,33]),6*s,33*s); }
+    if(e.props.includes("pole-back")){ seg([[136,0],[136,172]],line,Math.max(4,s*6)); }
+    if(e.props.includes("pole-front")){ seg([[-10,0],[-10,40]],line,Math.max(4,s*6)); }
+    // far side
+    seg([P.hip,kL,P.fL],far,lw); seg([P.sh,eL,P.hL],far,lw*.85);
+    if(e.props.includes("db-hang-L")) dbH(P.hL,far);
+    // torso + head
+    const dir=[(P.sh[0]-P.hip[0])/T,(P.sh[1]-P.hip[1])/T], hc=[P.sh[0]+dir[0]*(HEAD+6),P.sh[1]+dir[1]*(HEAD+6)];
+    seg([P.hip,P.sh],near,lw*1.5);
+    ctx.fillStyle=near; ctx.beginPath(); ctx.arc(X(hc),Y(hc),HEAD*s,0,Math.PI*2); ctx.fill();
+    // near side
+    seg([P.hip,kR,P.fR],near,lw);
+    if(e.props.includes("db-goblet")){ const m=lp(P.hL,P.hR,.5); ctx.fillStyle=prop; ctx.fillRect(X(m)-5*s,Y(m)-14*s,10*s,28*s); ctx.fillRect(X(m)-9*s,Y(m)-17*s,18*s,6*s); ctx.fillRect(X(m)-9*s,Y(m)+11*s,18*s,6*s); }
+    seg([P.sh,eR,P.hR],near,lw*.85);
+    if(e.props.includes("db-hang-R")) dbH(P.hR,prop);
+    if(e.props.includes("db-hang-L")&&!e.props.includes("db-hang-R")) dbH(P.hL,prop);
+    // feet
+    ctx.fillStyle=near; [P.fR].forEach(f=>{ ctx.beginPath(); ctx.ellipse(X(f)+3*s,Y(f),7*s,3.2*s,0,0,Math.PI*2); ctx.fill(); });
+  }
+};
+$("pause").onclick=()=>{
+  if(yt.on()){ yt.paused=!yt.paused; yt.paused?yt.player.pauseVideo():yt.player.playVideo(); $("pause").textContent=yt.paused?"Play":"Pause"; return; }
+  anim.paused=!anim.paused; $("pause").textContent=anim.paused?"Play":"Pause";
+  if(anim.paused){ anim.pt=performance.now()-anim.t0; cancelAnimationFrame(anim.raf); } else { anim.t0=performance.now()-anim.pt; anim.loop(); } };
+window.addEventListener("resize",()=>{ if(anim.paused) anim.draw(anim.pt/1000); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{ if(anim.paused) anim.draw(anim.pt/1000); });
+
+// ---------- YouTube demo: loops e.s..e.e of the real video; any failure falls back to the canvas figure ----------
+const yt={api:null,player:null,ready:false,failed:false,playing:false,paused:false,ex:null,to:0,
+  on(){ return $("stage").classList.contains("has-vid")&&this.ready; },
+  load(){
+    if(!this.api) this.api=new Promise((res,rej)=>{
+      if(window.YT&&window.YT.Player) return res();
+      window.onYouTubeIframeAPIReady=res;
+      const s=document.createElement("script"); s.src="https://www.youtube.com/iframe_api"; s.onerror=rej; document.head.appendChild(s);
+      setTimeout(rej,8000);
+    });
+    return this.api;
+  },
+  show(e){
+    this.ex=e; this.playing=false; this.paused=false; clearTimeout(this.to);
+    if(!e.yt||this.failed){ this.off(); return false; }
+    $("stage").classList.add("has-vid"); anim.stop();
+    this.load().then(()=>{
+      if(this.ex!==e) return;
+      if(!this.player) this.player=new window.YT.Player("ytp",{videoId:e.yt,
+        playerVars:{autoplay:1,mute:1,controls:0,playsinline:1,rel:0,disablekb:1,fs:0,iv_load_policy:3,start:Math.floor(e.s)},
+        events:{onReady:ev=>{ this.ready=true; ev.target.mute(); this.cue(); },
+                onStateChange:ev=>this.state(ev.data), onError:()=>this.fail()}});
+      else if(this.ready) this.cue();
+    }).catch(()=>this.fail());
+    this.to=setTimeout(()=>{ if(!this.playing&&this.ex===e) this.fail(); },12000);
+    return true;
+  },
+  cue(){ const e=this.ex; if(!e||!e.yt||this.failed) return; this.player.loadVideoById({videoId:e.yt,startSeconds:e.s}); this.player.mute(); },
+  state(d){
+    if(d===window.YT.PlayerState.PLAYING){ this.playing=true; clearTimeout(this.to); try{ this.player.unloadModule("captions"); }catch(e){} }
+    if(d===window.YT.PlayerState.ENDED&&this.ex){ this.player.seekTo(this.ex.s,true); this.player.playVideo(); }
+  },
+  tick(){
+    if(!this.on()||this.paused||!this.ex||document.hidden) return;
+    const st=this.player.getPlayerState();
+    if(st===window.YT.PlayerState.PAUSED||st===window.YT.PlayerState.CUED){ this.player.playVideo(); return; }
+    const t=this.player.getCurrentTime();
+    if(t>=this.ex.e||t<this.ex.s-1) this.player.seekTo(this.ex.s,true);
+  },
+  off(){ $("stage").classList.remove("has-vid"); if(this.ready) this.player.pauseVideo(); },
+  fail(){ if(this.failed) return; this.failed=true; clearTimeout(this.to); this.off(); anim.start(EX[cur]); $("pause").textContent=anim.paused?"Play":"Pause"; }
+};
+setInterval(()=>yt.tick(),150);
+
+// ---------- Boot ----------
+$("today").textContent=fmtDate(TODAY);
+renderRestPick();
+history=lsGet("legday.sessions")||[];
+const localToday=history.find(s=>s.date===TODAY); if(localToday) session=fillSession(localToday);
+renderDay();
+renderExercise();
+(async()=>{
+  await store.init();
+  const {sessions,settings}=await store.loadAll();
+  if(store.mode==="db"){
+    history=sessions;
+    if(settings&&settings.rest&&!st0){ rest=settings.rest; renderRestPick(); }
+    const t=sessions.find(s=>s.date===TODAY);
+    if(t) session=fillSession(t);
+    renderRows(); renderStrip();
+    $("saved").textContent="Synced with your log";
+  } else { $("saved").textContent="Saving on this device"; }
+})();
+})();
+</script>
+
+</body>
+</html>
