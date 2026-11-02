@@ -14,18 +14,15 @@
 :root{
   --bg:#eef0f3; --surface:#ffffff; --sunk:#e3e6eb; --ink:#161a22; --muted:#5d6574; --line:#cfd4dc;
   --accent:#2a55d9; --accent-ink:#ffffff; --done:#1f8a52; --done-soft:#dcf0e4; --rest:#f2b705; --rest-ink:#1b1600;
-  --fig-near:#161a22; --fig-far:#9aa3b2; --prop:#2a55d9;
   --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#12151b; --surface:#1b2029; --sunk:#232935; --ink:#e9ecf2; --muted:#9aa3b3; --line:#323a48;
-  --accent:#6e92ff; --accent-ink:#0b1430; --done:#4cc985; --done-soft:#17352a; --rest:#f5c534; --rest-ink:#1b1600;
-  --fig-near:#e9ecf2; --fig-far:#5b6577; --prop:#6e92ff; color-scheme:dark}}
+  --accent:#6e92ff; --accent-ink:#0b1430; --done:#4cc985; --done-soft:#17352a; --rest:#f5c534; --rest-ink:#1b1600; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12151b; --surface:#1b2029; --sunk:#232935; --ink:#e9ecf2; --muted:#9aa3b3; --line:#323a48;
-  --accent:#6e92ff; --accent-ink:#0b1430; --done:#4cc985; --done-soft:#17352a; --rest:#f5c534; --rest-ink:#1b1600;
-  --fig-near:#e9ecf2; --fig-far:#5b6577; --prop:#6e92ff; color-scheme:dark}
+  --accent:#6e92ff; --accent-ink:#0b1430; --done:#4cc985; --done-soft:#17352a; --rest:#f5c534; --rest-ink:#1b1600; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 120px}
@@ -63,11 +60,12 @@ h2{font-family:var(--display);font-weight:700;font-size:1.9rem;line-height:1.05;
 .demo{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px}
 @media (max-width:600px){.demo{grid-template-columns:1fr}}
 .stage{background:var(--surface);border-radius:14px;box-shadow:inset 0 0 0 1px var(--line);position:relative;overflow:hidden;min-width:0}
-canvas{display:block;width:100%;aspect-ratio:4/3;max-width:100%}
+.novid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;aspect-ratio:16/9;padding:16px 16px 56px;text-align:center;color:var(--muted);font-weight:600}
 .vid{display:none;position:relative;width:100%;aspect-ratio:16/9;background:#000}
 .vid iframe,.vid>div{position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
 .stage.has-vid .vid{display:block}
-.stage.has-vid canvas{display:none}
+.stage.has-vid .novid{display:none}
+.pill[hidden]{display:none}
 .stagebar{position:absolute;left:10px;right:10px;bottom:10px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
 .stagebar>*{pointer-events:auto}
 .pill{border:0;border-radius:999px;padding:6px 12px;font-size:.85rem;font-weight:600;background:var(--sunk);color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
@@ -142,7 +140,7 @@ canvas{display:block;width:100%;aspect-ratio:4/3;max-width:100%}
   <section class="demo">
     <div class="stage" id="stage">
       <div class="vid"><div id="ytp"></div></div>
-      <canvas id="cv" width="640" height="480" aria-label="Looping motion demo"></canvas>
+      <div class="novid"><span>Demo video unavailable</span><span>Tap ▶ Full video to watch</span></div>
       <div class="stagebar">
         <button class="pill" id="pause" type="button">Pause</button>
         <a class="pill primary" id="watch" target="_blank" rel="noopener">▶ Full video</a>
@@ -179,98 +177,80 @@ canvas{display:block;width:100%;aspect-ratio:4/3;max-width:100%}
 (function(){
 "use strict";
 // ---------- Exercise library ----------
-// Poses: world units, y up, ground y=0, facing right. hip + torso angle (deg) gives the shoulder; feet/hands placed; knees/elbows solved by IK.
 const LEGS=[
  {id:"bridge",yt:"AL7VE_qo1K0",s:16,e:24,name:"Glute Bridge",video:"Glute bridge 2",sets:3,reps:"12",bw:true,
-  cues:["Feet flat, about a hand-length from your glutes, hip-width apart.","Brace your abs and tuck your ribs down before you lift.","Drive through your heels and squeeze your glutes to raise your hips.","Pause 2 seconds at the top, then lower with control."],
-  feel:"Glutes, with some hamstrings.",avoid:"Arching your lower back to get higher. Stop where your glutes finish the job.",tempo:"Tempo 1 up · 2 hold · 2 down",
-  vb:[20,195,-12,100],kp:{L:[0,1],R:[0,1]},ep:{L:[0,-1],R:[0,-1]},props:["mat"],
-  keys:[{hip:[110,10],ta:180,fL:[158,1],fR:[163,1],hL:[82,3],hR:[86,3]},{hip:[102,50],ta:221,fL:[158,1],fR:[163,1],hL:[82,3],hR:[86,3]}],seq:[0,1]},
+  cues:["Lie on your back with your heels lined up under your knees: not out wide, not tucked against your butt.","Hands flat on the floor. Push through your heels to lift your hips toward the ceiling; imagine thumbtacks under your toes so you can't push through them.","At the top, squeeze your glutes hard (hold a $100 bill between them) and tuck your hips under you, like a dog tucking its tail.","Can't feel your glutes? Hold the top for a couple of seconds, or put your hands on them."],
+  feel:"Glutes. Hamstrings means your feet are too far out; quads means they're too close or you're pushing through your toes.",avoid:"Stopping short at the top. Fully extend your hips.",tempo:"Up · squeeze 1–2 s at the top · down"},
  {id:"deadbug",yt:"RWp83SigTXg",s:85,e:91,name:"Dead Bug",video:"Dead bug tutorial",sets:3,reps:"8/side",bw:true,
-  cues:["Arms straight up over your shoulders, hips and knees at 90°.","Press your lower back into the floor and keep it there the whole set.","Reach the opposite arm and leg out slowly, exhale as you go.","Return to start, then switch sides."],
-  feel:"Deep abs. Your back should feel nothing.",avoid:"Letting your lower back peel off the floor. Shorten the reach instead.",tempo:"Slow: 3 seconds out, 2 back",
-  vb:[-30,200,-12,95],kp:{L:[0,1],R:[0,1]},ep:{L:[0,1],R:[0,1]},props:["mat"],
-  keys:[{hip:[100,10],ta:180,fL:[143,54],fR:[147,54],hL:[40,66],hR:[43,66]},
-        {hip:[100,10],ta:180,fL:[143,54],fR:[186,14],hL:[-14,15],hR:[43,66]},
-        {hip:[100,10],ta:180,fL:[186,14],fR:[147,54],hL:[40,66],hR:[-14,15]}],seq:[0,1,0,2]},
+  cues:["On your back, push your lower back into the floor and bring your ribs toward your belly button, without lifting your pelvis.","Lift your legs so your knees stack over your hips; arms straight up, wrists over shoulders.","Slowly lower your opposite arm and leg while your torso stays set in stone.","Make fists and squeeze everything (glutes, core, hands), then come back slowly and switch."],
+  feel:"Your core working to resist movement.",avoid:"Chasing more reps. You get better by holding the extended position longer.",tempo:"Hold the reach ~2 s at first, building to 5–7 s"},
  {id:"goblet",yt:"lXy8MfZNNyU",s:116.5,e:131,name:"Goblet Squat",video:"Goblet Squat Exercise Tutorial",sets:3,reps:"10",bw:false,
-  cues:["Hold the dumbbell vertically against your chest, elbows tucked.","Feet shoulder-width, toes slightly out.","Sit down between your heels, knees tracking over your toes.","Keep your chest tall and drive the floor away to stand."],
-  feel:"Quads and glutes; upper back works to stay tall.",avoid:"Heels lifting or knees caving in. Go only as deep as you can keep both.",tempo:"Tempo 3 down · 1 pause · 1 up",
-  vb:[30,175,-12,175],kp:{L:[1,0],R:[1,0]},ep:{L:[0,-1],R:[0,-1]},props:["db-goblet"],
-  keys:[{hip:[100,87],ta:90,fL:[98,0],fR:[104,0],hLr:[12,-22],hRr:[15,-22]},{hip:[70,42],ta:68,fL:[98,0],fR:[104,0],hLr:[12,-22],hRr:[15,-22]}],seq:[0,1]},
+  cues:["Hold the dumbbell close to your chest, but not jammed against it. Too far away loads your lower back.","Elbows point straight down, armpits squeezed shut, core braced like you're about to be punched.","Push your hips back a little, then drop into the squat with knees out over your 2nd–3rd toe. Grip the floor; toes stay down.","Push your feet into the floor to stand and squeeze your butt at the top."],
+  feel:"Legs, plus your core holding the weight in front.",avoid:"Going so deep your lower back rounds (stop at a comfortable depth), or letting your knees cave in.",tempo:"Tempo 3 down · 1 pause · 1 up"},
  {id:"slrdl",yt:"14uIyy6htzU",s:0,e:25.5,name:"Supported Single-Leg RDL",video:"Supported Single leg RDL",sets:3,reps:"8/leg",bw:false,
-  cues:["Light hand on the rack for balance only, weight in the other hand.","Soft bend in the standing knee and keep it there.","Push your hips back and let the free leg travel straight back.","Keep hips square to the floor; stand up by squeezing the glute."],
-  feel:"Hamstring stretch and glute of the standing leg.",avoid:"Rounding your back or opening your hip toward the ceiling.",tempo:"Tempo 3 down · 1 up",
-  vb:[0,190,-12,175],kp:{L:[1,0],R:[0,-1]},ep:{L:[0,-1],R:[0,-1]},props:["pole-back","db-hang-L"],
-  keys:[{hip:[100,87],ta:92,fL:[100,0],fR:[96,4],hL:[100,92],hR:[135,128]},{hip:[95,84],ta:14,fL:[100,0],fR:[11,61],hL:[150,44],hR:[137,72]}],seq:[0,1]},
+  cues:["Hold onto something about hip height for support.","Hold the dumbbell on the outside, away from your support, and keep it close to your body.","Keep a soft bend in your standing knee.","Push your hips back toward the wall behind you as your back leg rises toward the ceiling."],
+  feel:"",avoid:"Letting the dumbbell drift away from your body.",tempo:"Tempo 3 down · 1 up"},
  {id:"revcrunch",yt:"XVOIElqv5CQ",s:0,e:11.5,name:"Reverse Crunch",video:"Reverse crunches",sets:3,reps:"12",bw:true,
-  cues:["Lie flat and hold something solid overhead.","Start with knees bent and thighs about vertical.","Curl your hips off the floor, bringing knees toward your chest.","Lower your hips one vertebra at a time."],
-  feel:"Lower abs.",avoid:"Swinging the legs for momentum. The hips curl; the legs just ride along.",tempo:"Tempo 1 up · 1 hold · 3 down",
-  vb:[-35,175,-12,115],kp:{L:[0,1],R:[0,1]},ep:{L:[0,1],R:[0,1]},props:["mat","pole-front"],
-  keys:[{hip:[100,10],ta:180,fL:[138,40],fR:[142,40],hL:[-8,14],hR:[-6,14]},{hip:[92,26],ta:196,fL:[80,92],fR:[84,92],hL:[-8,14],hR:[-6,14],kpo:{L:[-1,.4],R:[-1,.4]}}],seq:[0,1]},
+  cues:["Hold onto something to anchor yourself.","Keep your knees bent the entire time.","Bring your knees toward your nose."],
+  feel:"",avoid:"Straightening your legs.",tempo:"Tempo 1 up · 1 hold · 3 down"},
  {id:"hipthrust",yt:"wpVUT3iCyXk",s:119,e:129,name:"Bodyweight Hip Thrust",video:"Bodyweight hip thrust",sets:3,reps:"15",bw:true,
-  cues:["Bench just under your shoulder blades, feet flat and hip-width.","Tuck your chin and keep your eyes forward as you rise.","Drive through your heels until your hips are level with your knees.","Squeeze hard for 2 seconds, lower under control."],
-  feel:"Glutes, hard at the top.",avoid:"Overextending your lower back at the top. Ribs stay down.",tempo:"Tempo 1 up · 2 hold · 2 down",
-  vb:[-15,195,-12,105],kp:{L:[0,1],R:[0,1]},ep:{L:[0,1],R:[0,1]},props:["bench"],
-  keys:[{hip:[96,20],ta:158,fL:[150,0],fR:[155,0],hL:[10,42],hR:[13,42]},{hip:[98,50],ta:188,fL:[150,0],fR:[155,0],hL:[10,42],hR:[13,42]}],seq:[0,1]},
+  cues:["Put your lower shoulder blades (not your upper back) on a bench, couch or table.","Feet flat with heels in line with your knees; chin tucked; core braced so your lower back doesn't sag at the bottom.","Push through your heels to drive your hips up. Imagine thumbtacks under your toes.","At the top, squeeze your glutes hard and rotate your hips up under you, then lower all the way down."],
+  feel:"Glutes, hard at the top.",avoid:"Looking up and overarching, or pushing through your toes and lifting your heels.",tempo:"Tempo 1 up · 2 hold · 2 down"},
  {id:"splitsquat",yt:"_dCpU-6yQF8",s:35,e:41.5,name:"DB Split Squat",video:"DB Split Squat 2",sets:3,reps:"8/leg",bw:false,
-  cues:["Long stance: front foot flat, back foot up on the toes.","Dumbbells hang at your sides, torso tall.","Drop straight down until the back knee almost touches.","Push through the front heel to stand. Finish all reps, then switch legs."],
-  feel:"Front-leg quad and glute.",avoid:"Lunging forward. The movement is down and up, like an elevator.",tempo:"Tempo 2 down · 1 up",
-  vb:[15,170,-12,175],kp:{L:[.3,-1],R:[1,.2]},ep:{L:[0,-1],R:[0,-1]},props:["db-hang-L","db-hang-R"],
-  keys:[{hip:[88,80],ta:90,fL:[48,4],fR:[122,0],hLr:[-3,-54],hRr:[0,-54]},{hip:[86,48],ta:90,fL:[48,4],fR:[122,0],hLr:[-3,-54],hRr:[0,-54]}],seq:[0,1]}
+  cues:["Stagger your feet like train tracks, a little out to the side, not in one line.","Lean your torso slightly forward and keep the dumbbells close to your body.","Bend both knees and lightly tap the back knee down (go as low as you can for now), then come back up.","Keep your front knee out over your 2nd–3rd toe the whole time."],
+  feel:"",avoid:"Staying bolt upright, which pushes your knee far forward. With knee pain, step the back foot farther back so the front shin stays vertical.",tempo:"Tempo 2 down · 1 up"}
 ];
-// Upper and Full days: no stick-figure poses (no `keys`), so the canvas fallback shows a "video unavailable" note.
 const UPPER=[
  {id:"latstretch",yt:"KA0Cz2Jx96Q",s:21,e:35,name:"Lat Stretch",video:"Lat Stretch",sets:2,reps:"30s",bw:true,
   cues:["Kneel facing a bench with your elbows on the edge, holding a stick or dowel.","Sit your hips back toward your heels.","Let your chest sink below the bench and bring your hands behind your head.","Breathe slowly and sink a little deeper on each exhale."],
   feel:"A long stretch down the sides of your back (lats) and into the triceps.",avoid:"Arching your lower back to fake depth. Keep your ribs down.",tempo:"Hold 30 s · slow breaths"},
  {id:"pullapart",yt:"rqrC3CGPLYU",s:0,e:23.5,name:"Band Pull-Apart",video:"Band Pull aparts",sets:3,reps:"15",bw:true,
-  cues:["Arms straight out in front at shoulder height, hands shoulder-width on the band.","Keep your shoulders down, away from your ears.","Pull the band apart by squeezing your shoulder blades together until it reaches your chest.","Return slowly; don't let the band snap you back."],
-  feel:"Upper back and the backs of your shoulders.",avoid:"Shrugging or arching your back to finish the rep.",tempo:"Tempo 1 out · 1 hold · 2 back"},
+  cues:["Grab the band so it already has some tension at the start.","Pull it apart until it reaches your sternum.","At the end, squeeze your shoulder blades as if pinching a pencil between them."],
+  feel:"Your upper back muscles squeezing.",avoid:"",tempo:"Tempo 1 out · 1 hold · 2 back"},
  {id:"elevpush",yt:"05b8XPyLjK0",s:8.5,e:23.5,name:"Elevated Push-Up",video:"Elevated hands Push Up",sets:3,reps:"10",bw:true,
-  cues:["Hands on a bench or bar, just outside shoulder width.","Body in one straight line from head to heels; glutes and abs tight.","Lower your chest to the edge with elbows about 45° from your sides.","Press the bench away until your arms are straight. Higher hands make it easier."],
-  feel:"Chest, front of the shoulders and triceps.",avoid:"Hips sagging or piking up. Move as one plank.",tempo:"Tempo 2 down · 1 up"},
+  cues:["Put your hands on a rack bar, bench, couch or table.","Hands just outside shoulder width.","Lower until your chest touches the surface, every rep.","If you can only get halfway down, use a higher surface."],
+  feel:"",avoid:"Half reps. Raise the surface instead.",tempo:"Tempo 2 down · 1 up"},
  {id:"dbrow",yt:"-iO2ZBSD1xw",s:0,e:22.5,name:"Bent-Over DB Row",video:"Bent Over DB Row",sets:3,reps:"10",bw:false,
-  cues:["Hinge at the hips with soft knees and a flat back.","Let the dumbbells hang under your shoulders.","Pull your elbows back toward your hips, squeezing your shoulder blades.","Lower all the way with control."],
-  feel:"Lats and mid-back.",avoid:"Rounding your back or heaving the weight with your hips.",tempo:"Tempo 1 up · 1 hold · 2 down"},
+  cues:["Sit your hips back toward the wall behind you.","Keep the dumbbells close to your body, not out in front and far away.","Row the dumbbells back toward your hips.","Squeeze your back at the end of each rep."],
+  feel:"Your back squeezing at the top.",avoid:"Letting the dumbbells drift away from your body.",tempo:"Tempo 1 up · 1 hold · 2 down"},
  {id:"kneelpress",yt:"2uQuLzrk_Eo",s:146.8,e:152.6,name:"Half-Kneeling DB Press",video:"Half Kneeling Single Arm DB Press Tutorial",sets:3,reps:"8/arm",bw:false,
-  cues:["One knee down, front foot flat, torso tall. Squeeze the glute of the down leg.","Dumbbell at your shoulder, wrist stacked over your elbow.","Press straight up until your arm is locked out beside your ear.","Lower to the shoulder with control. Finish all reps, then switch sides."],
-  feel:"Shoulder of the pressing arm, plus your core working to stay upright.",avoid:"Leaning away or arching your back to get the weight up.",tempo:"Tempo 1 up · 2 down"},
+  cues:["Press with the arm on the same side as the knee that's down. Squeeze that glute so your hips stay locked out.","Brace your core and hold your free arm out to the side. If it drops, you're leaning.","Shoulder down away from your ear (shoulder blade toward your back pocket), then press overhead and lower.","Stay perfectly upright. If you start leaning, end the set."],
+  feel:"Your shoulder, plus the side of your core keeping you from leaning.",avoid:"Leaning side to side, or shrugging the weight up.",tempo:"Tempo 1 up · 2 down"},
  {id:"helmsrow",yt:"s8XfN4biers",s:93.5,e:102.5,name:"Helms Underhand Row",video:"Helms Underhand Row",sets:3,reps:"10",bw:false,
-  cues:["Rest your forehead on the top of an incline bench and hinge until your back is flat.","Dumbbells hang straight down, palms facing forward (underhand).","Row your elbows back close to your sides.","Lower all the way to a full stretch. Keep your head on the pad."],
-  feel:"Lats and biceps.",avoid:"Lifting your head or using your hips to swing the weight.",tempo:"Tempo 1 up · 1 hold · 2 down"},
+  cues:["Rest your forehead (or upper chest) on an incline bench and push your hips back to the wall behind you, like an RDL.","Underhand grip: palms face the wall in front of you.","Pull your shoulders down and back, then drive your elbows down and back toward your hips, close to your body.","Your hands are just hooks: lead with your elbows and keep your hands in line with them."],
+  feel:"Glutes and hamstrings loaded from the hinge; your back doing the rowing.",avoid:"Pulling straight up with your hands.",tempo:"Tempo 1 up · 1 hold · 2 down"},
  {id:"lateral",yt:"FDreHfmyq5c",s:0,e:22.2,name:"DB Lateral Raise",video:"Standing DB Side Lateral Raise",sets:3,reps:"12",bw:false,
-  cues:["Stand tall with a slight forward lean and soft elbows.","Raise the dumbbells out to your sides, leading with your elbows.","Stop at shoulder height.","Lower slowly. Light weight, strict form."],
-  feel:"Sides of your shoulders.",avoid:"Shrugging or swinging your body to lift the weight.",tempo:"Tempo 1 up · 3 down"},
+  cues:["Stagger your feet and lean your torso slightly forward.","Push your hands out toward the corners of the room.","Raise the dumbbells to about ear level.","On the way down, stop a few inches before your legs."],
+  feel:"",avoid:"",tempo:"Tempo 1 up · 3 down"},
  {id:"skull",yt:"iFrvIcOxdnk",s:25,e:37,name:"DB Skullcrusher",video:"DB Skullcrusher Tutorial",sets:3,reps:"10",bw:false,
-  cues:["Lie on your back, knees bent, dumbbells straight up over your shoulders, palms facing in.","Keep your upper arms still and bend only at the elbows.","Lower the dumbbells beside your head.","Straighten your arms back up and squeeze your triceps."],
-  feel:"Triceps.",avoid:"Elbows flaring out or upper arms drifting back and forth.",tempo:"Tempo 3 down · 1 up"}
+  cues:["Lie back with the dumbbells up and your hands in line with your shoulders.","Lock your upper arms and shoulders in place; only your elbows bend.","Bend your elbows to lower the dumbbells to about your skull.","Straighten back up and squeeze your triceps. You don't need heavy weight."],
+  feel:"Triceps squeezing at the top.",avoid:"Moving your shoulders. That shifts the work to your lats.",tempo:"Tempo 3 down · 1 up"}
 ];
 const FULL=[
  {id:"hip9090",yt:"HTmGVp_sxKs",s:0,e:34,name:"Hip 90/90",video:"Hip 90 90",sets:2,reps:"6/side",bw:true,
-  cues:["Sit with both knees bent to 90°: one leg in front of you, the other out to the side.","Use your hands behind you for support if you need it.","Keep your feet planted and rotate both knees over to the other side.","Sit tall at each side, then switch smoothly."],
-  feel:"Hips opening and rotating, front and back.",avoid:"Forcing through knee pain. The turn comes from the hips.",tempo:"Slow and controlled"},
+  cues:["Line up your front heel with your back knee and back heel.","Transfer slowly from one side to the other.","Keep your core stable.","Actively move through your hips and feel them rotate."],
+  feel:"Your hips rotating.",avoid:"Going fast and flopping over without using your hips.",tempo:"Slow and controlled"},
  {id:"hollowpull",yt:"iQxYUPymBYo",s:43.5,e:54.5,name:"Hollow Hold Pullover",video:"Hollow Hold Pullover",sets:3,reps:"8",bw:false,
-  cues:["Lie on your back, legs up, and hold one dumbbell over your chest with both hands.","Press your lower back into the floor and keep your ribs down.","Lower the dumbbell overhead as far as your back stays flat.","Pull it back over your chest without letting your legs drop."],
-  feel:"Abs working hard to stay flat, plus a stretch through the lats.",avoid:"Your lower back lifting off the floor. Shorten the reach instead.",tempo:"Tempo 3 back · 2 over"},
+  cues:["Push your lower back into the floor as hard as you can, as if pinning a hand under it.","Core tight, legs straight up.","Holding a weight (or a ball, or nothing at first), reach behind your head to touch the floor, then bring it back.","Only your arms and shoulder blades move; your lower back stays down the whole time."],
+  feel:"Hard. If it isn't, you're not doing it right.",avoid:"Arching your back or letting your chest rise as the weight goes overhead.",tempo:"Tempo 3 back · 2 over"},
  {id:"gbrdl",yt:"dFb-cNLRtJ0",s:0,e:33.5,name:"Glute-Bias DB RDL",video:"Glute Bias DB RDL 2",sets:3,reps:"10",bw:false,
-  cues:["Dumbbells in front of your thighs, soft knees, back flat.","Push your hips back and let the dumbbells slide down your legs.","Stop when your hips can't travel back any further.","Drive your hips forward to stand and squeeze your glutes at the top."],
-  feel:"Glutes and hamstrings.",avoid:"Rounding your back or turning it into a squat.",tempo:"Tempo 3 down · 1 up"},
+  cues:["Keep a soft bend in your knees; don't lock your legs out.","Push your hips back to the wall behind you, letting your knees bend a little more than a normal RDL.","Sit back into your hips as you lower.","From the bottom, pinch your glutes together to stand back up."],
+  feel:"Glutes. Straighter legs shift it to your hamstrings.",avoid:"Locking your knees out.",tempo:"Tempo 3 down · 1 up"},
  {id:"standpress",yt:"HAcqhLcY1yg",s:0,e:16.5,name:"Standing DB Shoulder Press",video:"Standing DB Shoulder Press",sets:3,reps:"10",bw:false,
-  cues:["Feet hip-width; squeeze your glutes and keep your ribs down.","Dumbbells at your shoulders, palms forward.","Press straight up until your arms lock out overhead.","Lower back to your shoulders with control."],
-  feel:"Shoulders and triceps.",avoid:"Leaning back or arching your lower back to finish the press.",tempo:"Tempo 1 up · 2 down"},
+  cues:["Elbows at about 45°.","Lower the dumbbells to just below chin level.","At the top, keep a very soft bend in your elbows."],
+  feel:"",avoid:"Overextending your elbows at the top.",tempo:"Tempo 1 up · 2 down"},
  {id:"revlunge",yt:"Rv4P4cetZjQ",s:10.5,e:16,name:"Supported Reverse Lunge",video:"Supported Reverse Lunge",sets:3,reps:"8/leg",bw:false,
-  cues:["One hand on a rack or bench for balance, dumbbell in the other.","Step one foot back and drop the back knee toward the floor.","Keep most of your weight on the front foot.","Drive through the front heel to step back up. Finish all reps, then switch legs."],
-  feel:"Front-leg glute and quad.",avoid:"Pushing off the back foot to stand up.",tempo:"Tempo 2 down · 1 up"},
+  cues:["Support yourself with the hand on the same side as the leg stepping back, on something about hip height, a bit to the side and in front.","Hold the dumbbell in the other hand.","Lean forward slightly and step back, tapping the back knee down if you can.","Stand all the way back up."],
+  feel:"",avoid:"A support so high that you're reaching up to it at the bottom.",tempo:"Tempo 2 down · 1 up"},
  {id:"widerow",yt:"yIZYTVUBH0M",s:63,e:73,name:"1-Arm Elbow-Wide Row",video:"1 arm elbow wide row",sets:3,reps:"10/arm",bw:false,
-  cues:["Hinge with a flat back, free hand on a bench or rack.","Let the dumbbell hang under your shoulder.","Row with your elbow flaring out wide, away from your side.","Squeeze your upper back at the top, lower slowly."],
-  feel:"Upper back and the back of the shoulder.",avoid:"Twisting your torso open to lift the weight.",tempo:"Tempo 1 up · 1 hold · 2 down"},
+  cues:["Push your hips back with a slight bend in your knees, one hand on something for support.","Row with your elbow going out and up, elbow in line with your wrist.","At the bottom, reach toward the floor in front of you for a full stretch.","At the top, squeeze your upper back like pinching a pencil between your shoulder blades."],
+  feel:"Your upper back.",avoid:"Locking your knees out.",tempo:"Tempo 1 up · 1 hold · 2 down"},
  {id:"heelgoblet",yt:"hVQ1glE0yLQ",s:117.5,e:130.3,name:"Heel-Elevated Goblet Squat",video:"Heel Elevated Goblet Squat Tutorial",sets:3,reps:"10",bw:false,
-  cues:["Heels up on a plate or wedge, feet about hip-width.","Hold the weight at your chest, elbows pointing down.","Sit straight down and let your knees travel forward over your toes.","Keep your chest tall and push the floor away to stand."],
-  feel:"Quads, a lot.",avoid:"Your chest folding forward at the bottom.",tempo:"Tempo 3 down · 1 up"},
+  cues:["Heels up on a plate (or stacked plates), toes on the floor.","Weight at your chest, elbows straight down, armpits squeezed, core tight.","Butt goes back first, then drop your hips straight down; let your knees travel over your toes while keeping them out.","Go low, bringing your hamstrings toward your calves, then stand back up."],
+  feel:"Quads.",avoid:"Knees caving in.",tempo:"Tempo 3 down · 1 up"},
  {id:"reardelt",yt:"wbxcToQE168",s:0,e:14.8,name:"Bent-Over Rear Delt Extension",video:"Bent over rear delt ext",sets:3,reps:"12",bw:false,
-  cues:["Hinge forward with a flat back, dumbbells hanging under your shoulders.","Keep your arms straight.","Sweep the dumbbells back past your hips.","Pause, then let them swing back under you with control."],
-  feel:"Back of the shoulders and upper back.",avoid:"Bending your elbows or standing up to swing the weight.",tempo:"Tempo 1 back · 1 hold · 2 down"}
+  cues:["Keep a soft bend in your arms the entire time.","Drive the back of the dumbbells toward the wall behind you."],
+  feel:"The back of your shoulders.",avoid:"",tempo:"Tempo 1 back · 1 hold · 2 down"}
 ];
 const DAYS={legs:{title:"Leg Day v1",list:"PLceyAUiKKclxn3VE34Rlkcc-xc7Wqinl4",ex:LEGS},
             upper:{title:"Upper Day v1",list:"PLceyAUiKKclzSP0-VMYWsRDRwrxQlFt-H",ex:UPPER},
@@ -365,12 +345,13 @@ function renderExercise(){
   const ol=$("cues"); ol.innerHTML=""; e.cues.forEach(c=>{const li=document.createElement("li");li.textContent=c;ol.appendChild(li)});
   $("feel").innerHTML="<b>Feel it</b>"; $("feel").append(document.createTextNode(e.feel));
   $("avoid").innerHTML="<b>Avoid</b>"; $("avoid").append(document.createTextNode(e.avoid));
+  $("feel").hidden=!e.feel; $("avoid").hidden=!e.avoid; // blank when the video doesn't say
   $("tempo").textContent=e.tempo;
   $("watch").href=e.yt?"https://www.youtube.com/watch?v="+e.yt+"&t="+Math.floor(e.s)+"s":YT+encodeURIComponent("Eric Roberts "+e.video);
   $("wlabel").textContent=e.bw?"+Lbs":"Lbs";
   $("prev").disabled=cur===0; $("next").textContent=cur===EX.length-1?"Finish ✓":"Next →";
   renderRows(); renderStrip();
-  if(yt.show(e)) $("pause").textContent="Pause"; else { anim.start(e); $("pause").textContent=anim.paused?"Play":"Pause"; }
+  $("pause").hidden=!yt.show(e); $("pause").textContent="Pause";
   lsSet("legday.ui",{cur,rest,day});
 }
 function renderRows(){
@@ -433,85 +414,7 @@ let lock=null;
 async function wake(){ try{ if(!lock&&navigator.wakeLock&&document.visibilityState==="visible"){ lock=await navigator.wakeLock.request("screen"); lock.addEventListener("release",()=>{lock=null}); } }catch(e){} }
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){ wake(); if(timer.iv) timer.tick(); } });
 
-// ---------- Motion demo ----------
-const cv=$("cv"), ctx=cv.getContext("2d");
-const T=60, TH=45, SH=45, UA=30, FA=28, HEAD=11;
-function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
-function ik(a,c,l1,l2,pref){
-  let dx=c[0]-a[0], dy=c[1]-a[1], d=Math.hypot(dx,dy); const max=l1+l2-0.5; if(d>max){ d=max; } if(d<1) d=1;
-  const base=Math.atan2(dy,dx), ang=Math.acos(Math.max(-1,Math.min(1,(l1*l1+d*d-l2*l2)/(2*l1*d))));
-  const k1=[a[0]+l1*Math.cos(base+ang),a[1]+l1*Math.sin(base+ang)], k2=[a[0]+l1*Math.cos(base-ang),a[1]+l1*Math.sin(base-ang)];
-  const s1=(k1[0]-a[0])*pref[0]+(k1[1]-a[1])*pref[1], s2=(k2[0]-a[0])*pref[0]+(k2[1]-a[1])*pref[1];
-  return s1>=s2?k1:k2;
-}
-const lerp=(a,b,t)=>a+(b-a)*t, lp=(a,b,t)=>[lerp(a[0],b[0],t),lerp(a[1],b[1],t)];
-function resolve(k){
-  const sh=[k.hip[0]+T*Math.cos(k.ta*Math.PI/180),k.hip[1]+T*Math.sin(k.ta*Math.PI/180)];
-  return {hip:k.hip,ta:k.ta,sh,fL:k.fL,fR:k.fR,hL:k.hLr?[sh[0]+k.hLr[0],sh[1]+k.hLr[1]]:k.hL,hR:k.hRr?[sh[0]+k.hRr[0],sh[1]+k.hRr[1]]:k.hR,kpo:k.kpo};
-}
-function blend(A,B,t){
-  const ta=lerp(A.ta,B.ta,t), hip=lp(A.hip,B.hip,t);
-  const sh=[hip[0]+T*Math.cos(ta*Math.PI/180),hip[1]+T*Math.sin(ta*Math.PI/180)];
-  return {hip,sh,fL:lp(A.fL,B.fL,t),fR:lp(A.fR,B.fR,t),hL:lp(A.hL,B.hL,t),hR:lp(A.hR,B.hR,t),kpo:t<.5?A.kpo:B.kpo};
-}
-const anim={ex:null,raf:0,t0:0,paused:false,pt:0,
-  start(e){ this.ex=e; this.keys=e.keys?e.keys.map(resolve):null; this.t0=performance.now(); this.pt=0; cancelAnimationFrame(this.raf); this.loop(); },
-  stop(){ cancelAnimationFrame(this.raf); },
-  loop(){ const now=performance.now(); const el=this.paused?this.pt:(now-this.t0); this.draw(el/1000); if(!this.paused) this.raf=requestAnimationFrame(()=>this.loop()); },
-  pose(sec){ const seq=this.ex.seq, seg=1.15, hold=0.35, per=seg+hold, n=seq.length, tt=sec%(per*n), i=Math.floor(tt/per), f=tt-i*per;
-    const A=this.keys[seq[i]], B=this.keys[seq[(i+1)%n]]; const u=f<hold?0:(f-hold)/seg; const e=0.5-0.5*Math.cos(Math.PI*u); return blend(A,B,e); },
-  draw(sec){
-    const e=this.ex, dpr=Math.min(window.devicePixelRatio||1,2), W=cv.clientWidth||640, H=W*0.75;
-    if(cv.width!==Math.round(W*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
-    ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
-    if(!this.keys){ // no figure for this exercise: point at the video instead
-      ctx.fillStyle=css("--muted"); ctx.textAlign="center"; ctx.font="600 "+Math.max(15,W/26)+"px "+css("--body");
-      ctx.fillText("Demo video unavailable",W/2,H/2-14); ctx.fillText("Tap ▶ Full video to watch",W/2,H/2+14); ctx.textAlign="start";
-      cancelAnimationFrame(this.raf); return;
-    }
-    const [x0,x1,y0,y1]=e.vb, padB=44, s=Math.min((W-24)/(x1-x0),(H-padB-16)/(y1-y0));
-    const ox=(W-(x1-x0)*s)/2-x0*s, oy=16+(y1-y0)*s+ (H-padB-16-(y1-y0)*s)/2 + y0*s;
-    const X=p=>ox+p[0]*s, Y=p=>oy-p[1]*s;
-    const near=css("--fig-near"), far=css("--fig-far"), prop=css("--prop"), line=css("--line"), sunk=css("--sunk");
-    // ground
-    ctx.strokeStyle=line; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(8,Y([0,0])); ctx.lineTo(W-8,Y([0,0])); ctx.stroke();
-    const P=this.pose(sec);
-    const kp=P.kpo||e.kp;
-    const kL=ik(P.hip,P.fL,TH,SH,kp.L), kR=ik(P.hip,P.fR,TH,SH,kp.R);
-    const eL=ik(P.sh,P.hL,UA,FA,e.ep.L), eR=ik(P.sh,P.hR,UA,FA,e.ep.R);
-    const lw=Math.max(5,s*7.5);
-    const seg=(pts,col,w)=>{ ctx.strokeStyle=col; ctx.lineWidth=w; ctx.lineCap="round"; ctx.lineJoin="round"; ctx.beginPath(); ctx.moveTo(X(pts[0]),Y(pts[0])); for(let i=1;i<pts.length;i++) ctx.lineTo(X(pts[i]),Y(pts[i])); ctx.stroke(); };
-    const dbH=(p,col)=>{ ctx.fillStyle=col; const w=26*s, h=9*s; ctx.fillRect(X(p)-w/2,Y(p)-h/2+h*.2,w,h*.6); ctx.fillRect(X(p)-w/2-2,Y(p)-h,w*.28,h*2); ctx.fillRect(X(p)+w/2-w*.28+2,Y(p)-h,w*.28,h*2); };
-    // props behind
-    if(e.props.includes("mat")){ ctx.fillStyle=sunk; ctx.fillRect(X([x0+6,0]),Y([0,3]),(x1-x0-12)*s,3*s); }
-    if(e.props.includes("bench")){ ctx.fillStyle=sunk; ctx.fillRect(X([0,40]),Y([0,40]),58*s,7*s); ctx.fillRect(X([8,33]),Y([0,33]),6*s,33*s); ctx.fillRect(X([44,33]),Y([0,33]),6*s,33*s); }
-    if(e.props.includes("pole-back")){ seg([[136,0],[136,172]],line,Math.max(4,s*6)); }
-    if(e.props.includes("pole-front")){ seg([[-10,0],[-10,40]],line,Math.max(4,s*6)); }
-    // far side
-    seg([P.hip,kL,P.fL],far,lw); seg([P.sh,eL,P.hL],far,lw*.85);
-    if(e.props.includes("db-hang-L")) dbH(P.hL,far);
-    // torso + head
-    const dir=[(P.sh[0]-P.hip[0])/T,(P.sh[1]-P.hip[1])/T], hc=[P.sh[0]+dir[0]*(HEAD+6),P.sh[1]+dir[1]*(HEAD+6)];
-    seg([P.hip,P.sh],near,lw*1.5);
-    ctx.fillStyle=near; ctx.beginPath(); ctx.arc(X(hc),Y(hc),HEAD*s,0,Math.PI*2); ctx.fill();
-    // near side
-    seg([P.hip,kR,P.fR],near,lw);
-    if(e.props.includes("db-goblet")){ const m=lp(P.hL,P.hR,.5); ctx.fillStyle=prop; ctx.fillRect(X(m)-5*s,Y(m)-14*s,10*s,28*s); ctx.fillRect(X(m)-9*s,Y(m)-17*s,18*s,6*s); ctx.fillRect(X(m)-9*s,Y(m)+11*s,18*s,6*s); }
-    seg([P.sh,eR,P.hR],near,lw*.85);
-    if(e.props.includes("db-hang-R")) dbH(P.hR,prop);
-    if(e.props.includes("db-hang-L")&&!e.props.includes("db-hang-R")) dbH(P.hL,prop);
-    // feet
-    ctx.fillStyle=near; [P.fR].forEach(f=>{ ctx.beginPath(); ctx.ellipse(X(f)+3*s,Y(f),7*s,3.2*s,0,0,Math.PI*2); ctx.fill(); });
-  }
-};
-$("pause").onclick=()=>{
-  if(yt.on()){ yt.paused=!yt.paused; yt.paused?yt.player.pauseVideo():yt.player.playVideo(); $("pause").textContent=yt.paused?"Play":"Pause"; return; }
-  anim.paused=!anim.paused; $("pause").textContent=anim.paused?"Play":"Pause";
-  if(anim.paused){ anim.pt=performance.now()-anim.t0; cancelAnimationFrame(anim.raf); } else { anim.t0=performance.now()-anim.pt; anim.loop(); } };
-window.addEventListener("resize",()=>{ if(anim.paused) anim.draw(anim.pt/1000); });
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{ if(anim.paused) anim.draw(anim.pt/1000); });
-
-// ---------- YouTube demo: loops e.s..e.e of the real video; any failure falls back to the canvas figure ----------
+// ---------- YouTube demo: loops e.s..e.e of the real video; any failure shows the "video unavailable" note ----------
 const yt={api:null,player:null,ready:false,failed:false,playing:false,paused:false,ex:null,to:0,
   on(){ return $("stage").classList.contains("has-vid")&&this.ready; },
   load(){
@@ -526,7 +429,7 @@ const yt={api:null,player:null,ready:false,failed:false,playing:false,paused:fal
   show(e){
     this.ex=e; this.playing=false; this.paused=false; clearTimeout(this.to);
     if(!e.yt||this.failed){ this.off(); return false; }
-    $("stage").classList.add("has-vid"); anim.stop();
+    $("stage").classList.add("has-vid");
     this.load().then(()=>{
       if(this.ex!==e) return;
       if(!this.player) this.player=new window.YT.Player("ytp",{videoId:e.yt,
@@ -551,9 +454,10 @@ const yt={api:null,player:null,ready:false,failed:false,playing:false,paused:fal
     if(t>=this.ex.e||t<this.ex.s-1) this.player.seekTo(this.ex.s,true);
   },
   off(){ $("stage").classList.remove("has-vid"); if(this.ready) this.player.pauseVideo(); },
-  fail(){ if(this.failed) return; this.failed=true; clearTimeout(this.to); this.off(); anim.start(EX[cur]); $("pause").textContent=anim.paused?"Play":"Pause"; }
+  fail(){ if(this.failed) return; this.failed=true; clearTimeout(this.to); this.off(); $("pause").hidden=true; }
 };
 setInterval(()=>yt.tick(),150);
+$("pause").onclick=()=>{ if(!yt.on()) return; yt.paused=!yt.paused; yt.paused?yt.player.pauseVideo():yt.player.playVideo(); $("pause").textContent=yt.paused?"Play":"Pause"; };
 
 // ---------- Boot ----------
 $("today").textContent=fmtDate(TODAY);
